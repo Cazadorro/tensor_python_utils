@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import sys
+import itertools
 def generate_sparse_tensor_2d(sparsity_fraction : float, shape : tuple, fill_diagonal : bool = True) -> np.ndarray:
     # create an array of uniformly random values, set only sparsity fraction of the tensor to 1.
     empty_fraction =  np.clip(1.0 - sparsity_fraction, 0, 1.0)
@@ -50,7 +51,8 @@ class CooTensor:
                 values.append(float(coo_split[mode_count - 1]))
                 indices.append([int(x) - 1 for x in coo_split[:mode_count - 1]])
 
-            return cls(np.array(values), np.array(indices), shape)
+            # fortran order of indexes.
+            return cls(np.array(values), np.flip(np.array(indices), 1), shape)
 
     @classmethod
     def from_numpy(cls, array : np.ndarray) -> 'CooTensor':
@@ -128,6 +130,27 @@ def main():
     coo_3d.save("test_tensor_script_3d.tns")
 
     # 32x32x32, 32x32x512, 512x512x512, 1024,
+
+    widths = [32, 128, 512, 1024]
+    depths = [32, 128, 512, 1024]
+    densities = [0.01, 0.005, 0.0025]
+    slice_diagonal_fraction = 0.3
+    permutation = list(itertools.product(*[widths, depths, densities]))
+    for [width, depth, density] in permutation:
+        np_tensor_2d = generate_sparse_tensor_2d(density, (width, width))
+        coo_2d = CooTensor.from_numpy(np_tensor_2d)
+
+        np_tensor_3d = generate_sparse_tensor_3d(density, (depth, width, width), slice_diagonal_fraction)
+        coo_3d = CooTensor.from_numpy(np_tensor_3d)
+        coo_2d_file_name = "test_tensor_script_2d_{}_{}_{}.tns".format(width, width, int(density * 10000))
+        coo_3d_file_name = "test_tensor_script_3d_{}_{}_{}_{}.tns".format(width, width, depth, int(density * 10000))
+        coo_2d.save(coo_2d_file_name)
+        coo_3d.save(coo_3d_file_name)
+        print("saved: " + coo_2d_file_name)
+        print("saved: " + coo_3d_file_name)
+
+
+    # 1.0 % and half a percent with sizes.
     print(len(coo_3d))
 
 
